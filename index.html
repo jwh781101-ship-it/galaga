@@ -221,7 +221,7 @@ const SFX = {
   homing: () => beep(700, 0.08, 'triangle', 0.05),
   hit: () => { noise(0.1, 0.1); beep(200, 0.08, 'sawtooth', 0.08); },
   playerDie: () => { sweep(400, 50, 0.5, 'sawtooth', 0.15); setTimeout(() => noise(0.3, 0.2), 200); },
-  capture: () => sweep(200, 800, 0.8, 'sine', 0.1),
+  capture: () => { sweep(150, 900, 2.0, 'sine', 0.1); setTimeout(() => sweep(300, 100, 0.8, 'triangle', 0.08), 1200); },
   stageStart: () => { beep(600, 0.1); setTimeout(() => beep(800, 0.1), 100); setTimeout(() => beep(1000, 0.15), 200); },
   bonus: () => { beep(800, 0.08); setTimeout(() => beep(1200, 0.08), 80); setTimeout(() => beep(1600, 0.15), 160); },
   dive: () => sweep(300, 150, 0.3, 'square', 0.06),
@@ -879,11 +879,13 @@ function updatePlayer(dt) {
     if (!boss || !boss.alive) {
       rescuePlayer();
     } else {
-      player.captureAngle += dt * 10;
+      // 거미줄에 감기듯 천천히 회전하며 끌려감
+      player.captureAngle += dt * 4;  // 회전 속도 감소 (10 → 4)
       const dx = boss.x - player.x;
-      const dy = (boss.y + 12) - player.y;
-      player.x += dx * dt * 3;
-      player.y += dy * dt * 3;
+      const dy = (boss.y + 24) - player.y;  // 보스 하단에 붙도록 (크기 2배 반영)
+      // 속도 감소: 초당 80% → 약 2.5초에 걸쳐 도달
+      player.x += dx * dt * 0.8;
+      player.y += dy * dt * 0.8;
       if (Math.abs(dx) < 2 && Math.abs(dy) < 2) {
         boss.capturedFighter = true;
         player.captured = false;
@@ -1120,24 +1122,62 @@ function updateEnemy(e, dt) {
         e.tractorTried = true;
         e.state = 'tractor';
         e.tractorT = 0;
+        e.tractorPhase = 'expand';  // expand → hold → fade
+        e.tractorBeamAmt = 0;       // 빔 확장 정도 0~1
       }
     }
     if (e.y > GH + 30) { e.state = 'return'; e.x = e.tx; e.y = -20; }
   } else if (e.state === 'tractor') {
     e.tractorT += dt;
     e.tractorActive = true;
-    const beamX = e.x, topY = e.y + 6, botY = GH - 10;
-    const topW = 30, botW = 50;
-    if (player.active && !player.captured && !player.dual) {
-      const tt = (player.y - topY) / (botY - topY);
-      if (tt >= 0 && tt <= 1) {
-        const halfW = (topW + (botW - topW) * tt) / 2;
-        if (Math.abs(player.x - beamX) < halfW) capturePlayer(e);
+    // 보스는 빔 쏘는 동안 제자리 정지 (살짝 떨림)
+    e.x = e.tractorX || (e.tractorX = e.x);
+    const shake = Math.sin(e.tractorT * 30) * 0.5;
+    e.angle = shake * 0.1;
+
+    const EXPAND_TIME = 1.2;  // 빔 펼쳐지는 시간
+    const HOLD_TIME = 1.5;    // 완전 전개 후 포획 판정 지속 시간
+    const FADE_TIME = 0.6;    // 빔 사라지는 시간
+
+    if (e.tractorPhase === 'expand') {
+      // 빔이 점점 펼쳐짐
+      e.tractorBeamAmt = Math.min(1, e.tractorT / EXPAND_TIME);
+      if (e.tractorT >= EXPAND_TIME) {
+        e.tractorPhase = 'hold';
+        e.tractorHoldT = 0;
+      }
+    } else if (e.tractorPhase === 'hold') {
+      e.tractorBeamAmt = 1;
+      e.tractorHoldT = (e.tractorHoldT || 0) + dt;
+
+      // 포획 판정 (완전 전개 상태에서만)
+      if (player.active && !player.captured && !player.dual) {
+        const beamX = e.x, topY = e.y + 12, botY = GH - 10;
+        const topW = 36, botW = 58;
+        const tt = (player.y - topY) / (botY - topY);
+        if (tt >= 0 && tt <= 1) {
+          const halfW = (topW + (botW - topW) * tt) / 2;
+          if (Math.abs(player.x - beamX) < halfW) capturePlayer(e);
+        }
+      }
+      if (e.tractorHoldT >= HOLD_TIME || e.captured) {
+        e.tractorPhase = 'fade';
+        e.tractorFadeT = 0;
+      }
+    } else if (e.tractorPhase === 'fade') {
+      e.tractorFadeT = (e.tractorFadeT || 0) + dt;
+      e.tractorBeamAmt = Math.max(0, 1 - e.tractorFadeT / FADE_TIME);
+      if (e.tractorFadeT >= FADE_TIME) {
+        e.tractorActive = false;
+        e.tractorX = null;
+        e.state = 'return';
+        e.x = e.tx;
       }
     }
-    if (e.tractorT > 2.5 || e.captured) {
-      e.tractorActive = false;
-      e.state = 'return'; e.x = e.tx;
+    // 플레이어가 포획됐으면 빔은 계속 활성 상태 유지 (흡수 중)
+    if (e.captured && player.captured) {
+      e.tractorBeamAmt = 1;
+      e.tractorActive = true;
     }
   } else if (e.state === 'return') {
     const fp = formationPos(e.col, e.row);
@@ -1530,12 +1570,20 @@ function render() {
 }
 
 function drawTractorBeam(e) {
-  const beamX = e.x, topY = e.y + 6, botY = GH - 10;
-  const topW = 30, botW = 50;
+  const amt = e.tractorBeamAmt !== undefined ? e.tractorBeamAmt : 1;
+  if (amt <= 0) return;
+  const beamX = e.x;
+  const topY = e.y + 12;
+  // 빔 길이: 확장 단계에선 짧게, 완전 전개 시 바닥까지
+  const botY = topY + (GH - 10 - topY) * amt;
+  const topW = 36 * amt;           // 상단 폭도 같이 확장
+  const botW = 58 * amt;           // 하단 폭도 같이 확장
   const t = e.tractorT;
   const pulse = 0.5 + 0.5 * Math.sin(t * 8);
   ctx.save();
-  ctx.globalAlpha = 0.3 + pulse * 0.3;
+
+  // 빔 외곽 (그라데이션)
+  ctx.globalAlpha = (0.3 + pulse * 0.3) * amt;
   const grad = ctx.createLinearGradient(beamX, topY, beamX, botY);
   grad.addColorStop(0, 'rgba(100,200,255,0.9)');
   grad.addColorStop(0.5, 'rgba(150,220,255,0.5)');
@@ -1545,14 +1593,32 @@ function drawTractorBeam(e) {
   ctx.moveTo(beamX - topW/2, topY); ctx.lineTo(beamX + topW/2, topY);
   ctx.lineTo(beamX + botW/2, botY); ctx.lineTo(beamX - botW/2, botY);
   ctx.closePath(); ctx.fill();
+
+  // 빔 안쪽 내부 링 (천천히 흐르는 파장)
   ctx.strokeStyle = '#fff';
-  ctx.globalAlpha = 0.5 + pulse * 0.3;
+  ctx.globalAlpha = (0.5 + pulse * 0.3) * amt;
   ctx.lineWidth = 1;
   for (let i = 0; i < 5; i++) {
     const frac = ((t * 0.3 + i * 0.2) % 1);
     const y = topY + (botY - topY) * frac;
     const w = topW + (botW - topW) * frac;
     ctx.beginPath(); ctx.moveTo(beamX - w/2, y); ctx.lineTo(beamX + w/2, y); ctx.stroke();
+  }
+
+  // 거미줄 같은 X자 교차 패턴 (포획 활성 시)
+  if (amt >= 0.9) {
+    ctx.globalAlpha = 0.3 * pulse;
+    ctx.strokeStyle = '#0ff';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 3; i++) {
+      const phase = (t * 0.5 + i * 0.33) % 1;
+      const y = topY + (botY - topY) * phase;
+      const w = topW + (botW - topW) * phase;
+      ctx.beginPath();
+      ctx.moveTo(beamX - w/2, y); ctx.lineTo(beamX + w/2, y + 6);
+      ctx.moveTo(beamX + w/2, y); ctx.lineTo(beamX - w/2, y + 6);
+      ctx.stroke();
+    }
   }
   ctx.restore();
 }
