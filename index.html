@@ -592,7 +592,7 @@ function drawSpriteRot(sprite, cx, cy, angle, pxSize=1) {
 
 // ============ 플레이어 ============
 const player = {
-  x: GW/2, y: GH - 30, w: 14, h: 14,
+  x: GW/2, y: GH - 40, w: 24, h: 24,
   alive: true, invuln: 0,
   shootTimer: 0, shootDelay: 0.22,
   dual: false,
@@ -601,7 +601,7 @@ const player = {
 };
 
 function resetPlayer() {
-  player.x = GW/2; player.y = GH - 30;
+  player.x = GW/2; player.y = GH - 40;
   player.alive = true; player.active = true; player.invuln = 2;
   player.shootTimer = 0; player.dual = false;
   player.captured = false; player.dying = false; player.dieTimer = 0; player.spawnTimer = 0;
@@ -614,7 +614,7 @@ const eBullets = [];  // 적
 function spawnPlayerBullet(x, y, vx=0, vy=-360, opts={}) {
   bullets.push({
     x, y, vx, vy,
-    w: opts.w || 2, h: opts.h || 8,
+    w: opts.w || 4, h: opts.h || 12,
     kind: opts.kind || 'normal',  // 'normal' | 'laser' | 'homing'
     target: opts.target || null,
     life: opts.life || 3,
@@ -624,19 +624,19 @@ function spawnPlayerBullet(x, y, vx=0, vy=-360, opts={}) {
   });
 }
 function spawnEnemyBullet(x, y, vx, vy) {
-  eBullets.push({ x, y, vx, vy, w: 3, h: 6 });
+  eBullets.push({ x, y, vx, vy, w: 5, h: 10 });
 }
 
 // ============ 사격 (무기별) ============
 function playerShoot() {
-  // 기본 오프셋
-  const px = player.x, py = player.y - 10;
+  // 기본 오프셋 (플레이어 크기 2배라 총구 위치도 2배)
+  const px = player.x, py = player.y - 18;
   const w = playerPwr.weapon;
   if (w === 'T') {
     // 트리플샷
     spawnPlayerBullet(px, py, 0, -380, { color: '#ff2' });
-    spawnPlayerBullet(px - 3, py + 2, -60, -370, { color: '#ff2' });
-    spawnPlayerBullet(px + 3, py + 2, 60, -370, { color: '#ff2' });
+    spawnPlayerBullet(px - 6, py + 4, -60, -370, { color: '#ff2' });
+    spawnPlayerBullet(px + 6, py + 4, 60, -370, { color: '#ff2' });
     SFX.shoot();
   } else if (w === 'W') {
     // 5웨이샷
@@ -647,25 +647,25 @@ function playerShoot() {
     SFX.shoot();
   } else if (w === 'L') {
     // 레이저 (관통)
-    spawnPlayerBullet(px, py, 0, -600, { kind: 'laser', w: 4, h: 16, color: '#08f', life: 2 });
+    spawnPlayerBullet(px, py, 0, -600, { kind: 'laser', w: 7, h: 24, color: '#08f', life: 2 });
     SFX.laser();
   } else if (w === 'H') {
     // 호밍 미사일 2발
-    const t1 = findNearestEnemy(px - 20, py);
-    const t2 = findNearestEnemy(px + 20, py);
-    spawnPlayerBullet(px - 4, py, -20, -200, { kind: 'homing', target: t1, w: 3, h: 6, color: '#f0f', life: 3 });
-    spawnPlayerBullet(px + 4, py, 20, -200, { kind: 'homing', target: t2, w: 3, h: 6, color: '#f0f', life: 3 });
+    const t1 = findNearestEnemy(px - 30, py);
+    const t2 = findNearestEnemy(px + 30, py);
+    spawnPlayerBullet(px - 8, py, -20, -200, { kind: 'homing', target: t1, w: 5, h: 10, color: '#f0f', life: 3 });
+    spawnPlayerBullet(px + 8, py, 20, -200, { kind: 'homing', target: t2, w: 5, h: 10, color: '#f0f', life: 3 });
     SFX.homing();
   } else {
     // 기본
     spawnPlayerBullet(px, py, 0, -360);
-    if (player.dual) spawnPlayerBullet(px + 10, py, 0, -360);
+    if (player.dual) spawnPlayerBullet(px + 20, py, 0, -360);
     SFX.shoot();
   }
   // 옵션 (양옆 보조기) - 기본 샷을 추가로 발사
   if (playerPwr.option) {
-    spawnPlayerBullet(px - 16, py + 4, 0, -340, { color: '#0f0' });
-    spawnPlayerBullet(px + 16, py + 4, 0, -340, { color: '#0f0' });
+    spawnPlayerBullet(px - 28, py + 8, 0, -340, { color: '#0f0' });
+    spawnPlayerBullet(px + 28, py + 8, 0, -340, { color: '#0f0' });
   }
 }
 
@@ -686,7 +686,7 @@ const enemies = [];
 const explosions = [];
 const popups = [];
 
-const FORM_COLS = 8, FORM_ROWS = 5, FORM_CELL_W = 22, FORM_CELL_H = 18, FORM_TOP = 40;
+const FORM_COLS = 8, FORM_ROWS = 5, FORM_CELL_W = 30, FORM_CELL_H = 28, FORM_TOP = 55;
 function formationPos(col, row) {
   const totalW = (FORM_COLS - 1) * FORM_CELL_W;
   const startX = (GW - totalW) / 2;
@@ -698,9 +698,9 @@ function makeEnemy(type, col, row, opts={}) {
   const fp = formationPos(col, row);
   const e = {
     type, col, row,
-    x: opts.spawnX ?? -20, y: opts.spawnY ?? -20,
+    x: opts.spawnX ?? -30, y: opts.spawnY ?? -30,
     tx: fp.x, ty: fp.y,
-    w: 14, h: 14,
+    w: 28, h: 28,
     hp: type === 'boss' ? 2 : 1,
     alive: true,
     state: 'enter', stateT: 0, pathT: 0,
@@ -718,17 +718,25 @@ function makeEnemy(type, col, row, opts={}) {
 
 function spawnPath(side='left') {
   const pts = [];
+  // 진입 경로는 화면 상단(y < 180)에만 머물도록 제한
+  // 플레이어는 화면 하단에 있으므로 이 경로로는 쏘기 힘듦
   if (side === 'left') {
-    pts.push({ x: -20, y: 50 }); pts.push({ x: 40, y: 100 });
-    pts.push({ x: 30, y: 180 }); pts.push({ x: 100, y: 200 });
-    pts.push({ x: GW/2, y: 120 });
+    pts.push({ x: -30, y: 30 });
+    pts.push({ x: 60, y: 50 });
+    pts.push({ x: 40, y: 120 });
+    pts.push({ x: 120, y: 160 });
+    pts.push({ x: GW/2, y: 80 });
   } else if (side === 'right') {
-    pts.push({ x: GW+20, y: 50 }); pts.push({ x: GW-40, y: 100 });
-    pts.push({ x: GW-30, y: 180 }); pts.push({ x: GW-100, y: 200 });
-    pts.push({ x: GW/2, y: 120 });
+    pts.push({ x: GW+30, y: 30 });
+    pts.push({ x: GW-60, y: 50 });
+    pts.push({ x: GW-40, y: 120 });
+    pts.push({ x: GW-120, y: 160 });
+    pts.push({ x: GW/2, y: 80 });
   } else {
-    pts.push({ x: GW/2, y: -20 }); pts.push({ x: GW/2 + 60, y: 80 });
-    pts.push({ x: GW/2 - 60, y: 150 }); pts.push({ x: GW/2, y: 100 });
+    pts.push({ x: GW/2, y: -30 });
+    pts.push({ x: GW/2 + 80, y: 60 });
+    pts.push({ x: GW/2 - 80, y: 140 });
+    pts.push({ x: GW/2, y: 80 });
   }
   return pts;
 }
@@ -836,7 +844,7 @@ function updatePlayer(dt) {
     }
     if (input.keys['ArrowLeft'] || input.keys['a']) player.x -= 200 * speedMul * dt;
     if (input.keys['ArrowRight'] || input.keys['d']) player.x += 200 * speedMul * dt;
-    player.x = clamp(player.x, 10, GW - 10);
+    player.x = clamp(player.x, 16, GW - 16);
   }
 
   if (game.state === STATE.PLAY && !player.dying && !player.captured) {
@@ -916,7 +924,7 @@ function killPlayer() {
   if (player.dual) {
     player.dual = false;
     SFX.hit();
-    explosions.push({ x: player.x + 10, y: player.y, frame: 0, timer: 0, dur: 0.6 });
+    explosions.push({ x: player.x + 20, y: player.y, frame: 0, timer: 0, dur: 0.6 });
     return;
   }
   // 옵션 먼저 소실
@@ -924,8 +932,8 @@ function killPlayer() {
     playerPwr.option = false;
     updatePowerupBar();
     SFX.hit();
-    explosions.push({ x: player.x - 16, y: player.y + 4, frame: 0, timer: 0, dur: 0.5 });
-    explosions.push({ x: player.x + 16, y: player.y + 4, frame: 0, timer: 0, dur: 0.5 });
+    explosions.push({ x: player.x - 28, y: player.y + 6, frame: 0, timer: 0, dur: 0.5 });
+    explosions.push({ x: player.x + 28, y: player.y + 6, frame: 0, timer: 0, dur: 0.5 });
     player.invuln = 1.5;
     return;
   }
@@ -989,13 +997,13 @@ function updateCapsules(dt) {
     c.blink += dt;
     c.life -= dt;
     if (c.y > GH + 20 || c.life <= 0) { capsules.splice(i, 1); continue; }
-    // 플레이어와 충돌
+    // 플레이어와 충돌 (플레이어 크기 2배에 맞춰 반경 확대)
     if (player.active && !player.dying && !player.captured) {
       const dx = c.x - player.x, dy = c.y - player.y;
-      if (Math.abs(dx) < 12 && Math.abs(dy) < 12) {
+      if (Math.abs(dx) < 20 && Math.abs(dy) < 20) {
         applyPowerup(c.type);
         capsules.splice(i, 1);
-      } else if (player.dual && Math.abs(c.x - (player.x + 10)) < 10 && Math.abs(dy) < 12) {
+      } else if (player.dual && Math.abs(c.x - (player.x + 20)) < 18 && Math.abs(dy) < 20) {
         applyPowerup(c.type);
         capsules.splice(i, 1);
       }
@@ -1015,7 +1023,7 @@ function updateEnemies(dt) {
            formation.waves[formation.spawned].delay <= formation.waveTimer) {
       const w = formation.waves[formation.spawned];
       const path = spawnPath(w.side);
-      const e = makeEnemy(w.type, w.col, w.row, { path, pathSpeed: 120 });
+      const e = makeEnemy(w.type, w.col, w.row, { path, pathSpeed: 180 });
       e.x = path[0].x; e.y = path[0].y;
       formation.spawned++;
     }
@@ -1212,7 +1220,9 @@ function updateBullets(dt) {
     let hitAny = false;
     for (const e of enemies) {
       if (!e.alive) continue;
-      const hitR = b.kind === 'laser' ? 10 : 9;
+      // 진입 중(enter 상태)이고 화면 상단 바깥이면 무적 (등장 연출 보호)
+      if (e.state === 'enter' && e.y < 20) continue;
+      const hitR = b.kind === 'laser' ? 16 : 14;
       if (Math.abs(b.x - e.x) < hitR && Math.abs(b.y - e.y) < hitR) {
         hitEnemy(e, b.dmg);
         hitAny = true;
@@ -1234,19 +1244,20 @@ function updateBullets(dt) {
     b.x += b.vx * dt; b.y += b.vy * dt;
     if (b.y < -10 || b.y > GH + 10 || b.x < -10 || b.x > GW + 10) { eBullets.splice(i, 1); continue; }
     if (player.active && !player.dying && !player.captured && player.invuln <= 0) {
-      if (Math.abs(b.x - player.x) < 6 && Math.abs(b.y - player.y) < 6) {
+      // 플레이어 피격 판정은 2배보다 작게 (실제 몸체 크기만큼, 날개 끝은 안 맞게)
+      if (Math.abs(b.x - player.x) < 9 && Math.abs(b.y - player.y) < 10) {
         eBullets.splice(i, 1); killPlayer(); continue;
       }
-      if (player.dual && Math.abs(b.x - (player.x + 10)) < 6 && Math.abs(b.y - player.y) < 6) {
+      if (player.dual && Math.abs(b.x - (player.x + 20)) < 9 && Math.abs(b.y - player.y) < 10) {
         eBullets.splice(i, 1); killPlayer(); continue;
       }
     }
   }
-  // 적 본체 충돌
+  // 적 본체 충돌 (크기 2배에 맞춰 반경 확대)
   for (const e of enemies) {
     if (!e.alive) continue;
     if (player.active && !player.dying && !player.captured && player.invuln <= 0) {
-      if (Math.abs(e.x - player.x) < 12 && Math.abs(e.y - player.y) < 12) {
+      if (Math.abs(e.x - player.x) < 18 && Math.abs(e.y - player.y) < 18) {
         hitEnemy(e, 1); killPlayer();
       }
     }
@@ -1425,8 +1436,8 @@ function render() {
     if (!e.alive) continue;
     const sp = getEnemySprite(e);
     if (e.hitFlash > 0) { ctx.save(); ctx.globalAlpha = 0.6; }
-    drawSpriteRot(sp, e.x, e.y, e.angle, 1);
-    if (e.capturedFighter) drawSpriteRot(SPR_CAPTURED, e.x, e.y - 14, e.angle, 1);
+    drawSpriteRot(sp, e.x, e.y, e.angle, 2);
+    if (e.capturedFighter) drawSpriteRot(SPR_CAPTURED, e.x, e.y - 28, e.angle, 2);
     if (e.hitFlash > 0) ctx.restore();
   }
 
@@ -1436,14 +1447,14 @@ function render() {
       const visible = player.invuln <= 0 || Math.floor(player.invuln * 10) % 2 === 0;
       if (visible) {
         if (player.captured) {
-          drawSpriteRot(SPR_PLAYER, player.x, player.y, player.captureAngle, 1);
+          drawSpriteRot(SPR_PLAYER, player.x, player.y, player.captureAngle, 2);
         } else {
-          drawSprite(SPR_PLAYER, player.x, player.y, 1);
-          if (player.dual) drawSprite(SPR_PLAYER, player.x + 10, player.y, 1);
+          drawSprite(SPR_PLAYER, player.x, player.y, 2);
+          if (player.dual) drawSprite(SPR_PLAYER, player.x + 20, player.y, 2);
           // 옵션 보조기
           if (playerPwr.option) {
-            drawSprite(SPR_OPTION, player.x - 16, player.y + 4, 1);
-            drawSprite(SPR_OPTION, player.x + 16, player.y + 4, 1);
+            drawSprite(SPR_OPTION, player.x - 28, player.y + 6, 2);
+            drawSprite(SPR_OPTION, player.x + 28, player.y + 6, 2);
           }
           // 실드
           if (playerPwr.shield) {
@@ -1453,12 +1464,12 @@ function render() {
             ctx.strokeStyle = '#0ff';
             ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.arc(player.x + (player.dual ? 5 : 0), player.y, 14 + pulse * 2, 0, Math.PI * 2);
+            ctx.arc(player.x + (player.dual ? 10 : 0), player.y, 24 + pulse * 2, 0, Math.PI * 2);
             ctx.stroke();
             ctx.strokeStyle = '#fff';
             ctx.globalAlpha = 0.3;
             ctx.beginPath();
-            ctx.arc(player.x + (player.dual ? 5 : 0), player.y, 16, 0, Math.PI * 2);
+            ctx.arc(player.x + (player.dual ? 10 : 0), player.y, 28, 0, Math.PI * 2);
             ctx.stroke();
             ctx.restore();
           }
@@ -1470,7 +1481,7 @@ function render() {
   // 폭발
   for (const x of explosions) {
     const idx = clamp(x.frame, 0, SPR_EXPLODE.length - 1);
-    drawSprite(SPR_EXPLODE[idx], x.x, x.y, x.big ? 1.3 : 1);
+    drawSprite(SPR_EXPLODE[idx], x.x, x.y, x.big ? 2.5 : 2);
   }
 
   // 점수 팝업
